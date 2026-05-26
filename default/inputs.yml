@@ -8,6 +8,7 @@ inputs:
     interval: 30
     filenames:
       - "*session-*.json"
+      - "*session-*.jsonl"
     filterArchivedFiles: false
     tailOnly: true
     idleTimeout: 300
