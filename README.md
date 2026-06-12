@@ -2,29 +2,33 @@
 
 ## Overview
 
-This Cribl Edge pack collects telemetry from 8 file monitor sources and 1 OTLP receiver across two Google AI developer tools and forwards it to a Cribl Stream worker group for indexing, analysis, and search:
+This Cribl Edge pack collects telemetry from 8 file monitor sources and 1 OTLP receiver across two Google AI developer tools
+and forwards it to a Cribl Stream worker group for indexing, analysis, and search:
 
 ### Gemini CLI
 
-1. **Chat sessions** — `~/.gemini/tmp/{projectHash}/chats/session-*.json` — Full conversation transcripts with messages, tool calls, model thoughts, and per-message token usage
+1. **Chat sessions** — `~/.gemini/tmp/{projectHash}/chats/session-*.json` — Full conversation transcripts with messages,
+   tool calls, model thoughts, and per-message token usage
 2. **User logs** — `~/.gemini/tmp/{projectHash}/logs.json` — User interaction message logs with session IDs and timestamps
 3. **Settings** — `~/.gemini/settings.json` — Configuration snapshots including tool permissions, security settings, and context files
 4. **Projects** — `~/.gemini/projects.json` — Project metadata and Google Cloud project associations
 
 ### Gemini CLI OpenTelemetry
 
-5. **OTLP receiver** — `127.0.0.1:4317` (gRPC) — Native OpenTelemetry traces from Gemini CLI when `GEMINI_TELEMETRY_ENABLED=true` and `GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317`
+1. **OTLP receiver** — `127.0.0.1:4317` (gRPC) — Native OpenTelemetry traces from Gemini CLI when `GEMINI_TELEMETRY_ENABLED=true`
+   and `GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317`
 
 ### Antigravity IDE
 
-6. **Application logs** — `~/Library/Application Support/Antigravity/logs/**/*.log` — Main process, extension host, language server, auth, telemetry, CloudCode, Chrome DevTools MCP, renderer performance, and crash logs
-7. **Agent brain** — `~/.gemini/antigravity/brain/**/*.md` — Agent task files, implementation plans, and walkthroughs with resolved version history
-8. **Annotations** — `~/.gemini/antigravity/annotations/*.pbtxt` — Annotation protobuf text metadata
-9. **Code tracker** — `~/.gemini/antigravity/code_tracker/**/*` — Code tracking snapshots and file state across active and historical sessions
+1. **Application logs** — `~/Library/Application Support/Antigravity/logs/**/*.log` — Main process, extension host, language
+   server, auth, telemetry, CloudCode, Chrome DevTools MCP, renderer performance, and crash logs
+2. **Agent brain** — `~/.gemini/antigravity/brain/**/*.md` — Agent task files, implementation plans, and walkthroughs with resolved version history
+3. **Annotations** — `~/.gemini/antigravity/annotations/*.pbtxt` — Annotation protobuf text metadata
+4. **Code tracker** — `~/.gemini/antigravity/code_tracker/**/*` — Code tracking snapshots and file state across active and historical sessions
 
 ## Architecture
 
-```
+```text
 Gemini CLI ──writes──> ~/.gemini/tmp/{hash}/chats/session-*.json
     |                                   |
     |                        Cribl Edge (file monitor)
@@ -71,9 +75,10 @@ Lighter-weight logs recording only user-initiated messages:
 - **Message** — The raw prompt text
 - **Timestamp** — ISO 8601
 
-### Gemini CLI OpenTelemetry
+### Gemini CLI OpenTelemetry (OTLP)
 
-Gemini CLI has native OpenTelemetry support. When enabled, it exports traces via OTLP gRPC to a configurable endpoint. This pack includes an OTLP receiver on port 4317 to collect these traces directly.
+Gemini CLI has native OpenTelemetry support. When enabled, it exports traces via OTLP gRPC to a configurable endpoint.
+This pack includes an OTLP receiver on port 4317 to collect these traces directly.
 
 **Enable via environment variables:**
 
@@ -106,7 +111,7 @@ Use this data for:
 
 Antigravity (Google's AI IDE) writes timestamped session log directories containing:
 
-```
+```text
 Log File                                    Description
 ---------------------------------------------------------------------
 main.log                                    App lifecycle, perf profiling sessions
@@ -143,13 +148,34 @@ Each document has `.resolved` and `.resolved.N` variants showing the evolution o
 
 ---
 
+## Data Contract
+
+Events leave this pack tagged with a `datatype` metadata field; Cribl Stream maps datatypes to Splunk sourcetypes/indexes per the table below.
+Knowledge objects for the sourcetypes ship in
+[VisiCore_TA_AI_Observability](https://github.com/JacobPEvans-personal/VisiCore_TA_AI_Observability) (v0.2.0+).
+
+| Input | Datatype | Splunk sourcetype | Index | TA support |
+|---|---|---|---|---|
+| `gemini-cli-sessions` | `gemini-cli-session` | `gemini:cli:session` | `gemini` | ✓ |
+| `gemini-cli-logs` | `gemini-cli-logs` | `gemini:cli:logs` | `gemini` | ✓ |
+| `gemini-cli-settings` | `gemini-cli-settings` | `gemini:cli:settings` | `gemini` | ✓ |
+| `gemini-cli-projects` | `gemini-cli-projects` | `gemini:cli:projects` | `gemini` | ✓ |
+| `gemini-cli-otel` | `gemini-cli-otel` | `gemini:cli:otel` | `gemini` | ✓ (TA 0.2.0+) |
+| `antigravity-app-logs` | `antigravity-app-logs` | `antigravity:app-logs` | `gemini` | ✓ |
+| `antigravity-brain` | `antigravity-brain` | `antigravity:brain` | `gemini` | ✓ |
+| `antigravity-annotations` | `antigravity-annotations` | `antigravity:annotations` | `gemini` | ✓ |
+| `antigravity-code-tracker` | `antigravity-code-tracker` | `antigravity:code-tracker` | `gemini` | ✓ |
+
+---
+
 ## Requirements
 
 - **Cribl Edge** 4.13.0+
 - **Gemini CLI** installed for the local user (`/opt/homebrew/bin/gemini` or equivalent)
 - **Antigravity IDE** installed (`/Applications/Antigravity.app` on macOS)
 - **Supported platforms:** macOS (Sonoma 14+, Sequoia 15+, Tahoe 26)
-- **Filesystem permissions:** The Cribl Edge process must have read access to `~/.gemini/` and `~/Library/Application Support/Antigravity/` (if using the respective inputs)
+- **Filesystem permissions:** The Cribl Edge process must have read access to `~/.gemini/` and
+  `~/Library/Application Support/Antigravity/` (if using the respective inputs)
 
 ---
 
@@ -157,7 +183,8 @@ Each document has `.resolved` and `.resolved.N` variants showing the evolution o
 
 ### Step 1: Set the `GEMINI_HOME` Environment Variable
 
-All file monitor paths use `$GEMINI_HOME/.gemini/<subdir>` or `$GEMINI_HOME/Library/Application Support/Antigravity/<subdir>` to resolve their target directories. Set `GEMINI_HOME` to the **home directory** of the user that runs Gemini CLI and/or Antigravity.
+All file monitor paths use `$GEMINI_HOME/.gemini/<subdir>` or `$GEMINI_HOME/Library/Application Support/Antigravity/<subdir>`
+to resolve their target directories. Set `GEMINI_HOME` to the **home directory** of the user that runs Gemini CLI and/or Antigravity.
 
 ```bash
 # macOS
@@ -168,7 +195,8 @@ export GEMINI_HOME=/Users/<user>
 
 ### Step 2: Grant Filesystem Permissions
 
-On macOS, Cribl Edge is typically installed under the current user account. If Edge is running as the same user that owns the Gemini/Antigravity files, no additional permission changes are needed.
+On macOS, Cribl Edge is typically installed under the current user account. If Edge is running as the same user that owns
+the Gemini/Antigravity files, no additional permission changes are needed.
 
 If Edge runs as a different user, grant read access using macOS ACLs:
 
@@ -192,6 +220,30 @@ ls /Users/<user>/.gemini/tmp/*/chats/
 ls "/Users/<user>/Library/Application Support/Antigravity/logs/"
 ```
 
+### Port Allocation
+
+OTLP ports are allocated org-wide so the AI telemetry packs can co-exist on a single Edge node — only one listener can bind
+a given port per node:
+
+| Port | Protocol | Owner |
+|---|---|---|
+| `4317` | OTLP/gRPC | [cc-edge-claude-code-otel](https://github.com/JacobPEvans-personal/cc-edge-claude-code-otel) — canonical OTLP/gRPC default |
+| `4318` | OTLP/HTTP | Reserved for OTLP/HTTP (no pack ships an HTTP listener yet) |
+| `4319` | OTLP/gRPC | [cc-edge-copilot-otel](https://github.com/JacobPEvans-personal/cc-edge-copilot-otel) |
+| `4321` | OTLP/gRPC | **This pack** (`gemini-cli-otel` input) — recommended port when co-deployed |
+
+> **Known conflict:** the shipped `default/inputs.yml` binds the `gemini-cli-otel` listener to port `4317`, which is owned by
+> [cc-edge-claude-code-otel](https://github.com/JacobPEvans-personal/cc-edge-claude-code-otel). Both packs cannot listen on
+> `4317` on the same Edge node. When co-deploying with the Claude pack, override this pack's OTLP source port to **`4321`**
+> (via the Cribl UI or a local pack override) and point Gemini CLI at the new port:
+
+```bash
+export GEMINI_TELEMETRY_ENABLED=true
+export GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4321
+```
+
+The shipped default is unchanged in this release; only the recommended co-deployment configuration is documented here.
+
 ---
 
 ## Pack Components
@@ -204,11 +256,11 @@ All file monitors resolve paths via `$GEMINI_HOME`. Each sets a `datatype` metad
 
 | Input | Path | Filter | Recursive | Interval |
 |---|---|---|---|---|
-| `gemini-cli-sessions` | `.gemini/tmp` | `session-*.json` | Yes | 10s |
+| `gemini-cli-sessions` | `.gemini/tmp` | `session-*.json, session-*.jsonl` | Yes | 30s |
 | `gemini-cli-logs` | `.gemini/tmp` | `logs.json` | Yes | 30s |
 | `gemini-cli-settings` | `.gemini` | `settings.json` | No | 120s |
 | `gemini-cli-projects` | `.gemini` | `projects.json` | No | 120s |
-| `antigravity-app-logs` | `Library/Application Support/Antigravity/logs` | `*.log` | Yes | 10s |
+| `antigravity-app-logs` | `Library/Application Support/Antigravity/logs` | `*.log` | Yes | 30s |
 | `antigravity-brain` | `.gemini/antigravity/brain` | `*.md` | Yes | 60s |
 | `antigravity-annotations` | `.gemini/antigravity/annotations` | `*.pbtxt` | No | 60s |
 | `antigravity-code-tracker` | `.gemini/antigravity/code_tracker` | `*.md, *.sh, *.nix, *.yaml, *.json` | Yes | 60s |
@@ -220,6 +272,7 @@ All file monitors resolve paths via `$GEMINI_HOME`. Each sets a `datatype` metad
 | `gemini-cli-otel` | OpenTelemetry | `127.0.0.1` | `4317` | gRPC | Disabled |
 
 Receives native OpenTelemetry traces from Gemini CLI. Enable with `GEMINI_TELEMETRY_ENABLED=true` and `GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317`.
+See [Port Allocation](#port-allocation) before co-deploying with other OTLP packs.
 
 ### Output: `default`
 
@@ -235,7 +288,7 @@ Forwards events to the Cribl Stream worker group for further routing and deliver
 
 Each `session-*.json` file is a standalone JSON document with this structure:
 
-```
+```text
 Field                        Description
 ---------------------------------------------------------------------
 sessionId                    Unique session identifier (UUID)
@@ -273,7 +326,7 @@ messages[]                   Array of conversation turns
 
 All Antigravity logs follow the VS Code log format:
 
-```
+```text
 YYYY-MM-DD HH:MM:SS.mmm [level] message
 ```
 
@@ -281,22 +334,26 @@ Levels: `info`, `warning`, `error`
 
 ### Key Log Sources
 
-**Language Server (Go)**
+#### Language Server (Go)
+
 - Process startup with PID and GOMAXPROCS
 - HTTPS/HTTP port bindings on localhost
 - Server initialization timing
 - MCP URL discovery
 
-**Extension Host**
+#### Extension Host
+
 - Extension activation order and timing
 - Activation events and root causes
 - Extension errors and missing modules
 
-**Chrome DevTools MCP**
+#### Chrome DevTools MCP
+
 - MCP server URL and port
 - Browser connection configuration
 
-**Performance**
+#### Performance
+
 - Renderer baseline measurements
 - Long task detection (>100ms threshold)
 - Profiling session start/stop
@@ -334,7 +391,8 @@ Levels: `info`, `warning`, `error`
 
 ### Stale file tracking
 
-Cribl Edge tracks file state in its kvstore. If you need to re-ingest files from the beginning, stop the worker, clear the relevant kvstore directories, and restart.
+Cribl Edge tracks file state in its kvstore. If you need to re-ingest files from the beginning, stop the worker,
+clear the relevant kvstore directories, and restart.
 
 - macOS: `/opt/cribl/state/kvstore/default/file_gemini-cli-*/` and `/opt/cribl/state/kvstore/default/file_antigravity-*/`
 
@@ -342,8 +400,17 @@ Cribl Edge tracks file state in its kvstore. If you need to re-ingest files from
 
 ## Release Notes
 
+- **0.2.3** — 2026-06-10
+  - Docs: add Data Contract section mapping all 9 inputs/datatypes to Splunk sourcetypes and the `gemini` index
+    (knowledge objects in VisiCore_TA_AI_Observability v0.2.0+)
+  - Docs: add org-wide OTLP Port Allocation table — document the 4317 conflict with cc-edge-claude-code-otel and the
+    recommended `4321` override when co-deployed (the shipped `inputs.yml` default is unchanged)
+  - Includes the `gemini-cli-sessions` fix from #10: also match `.jsonl` session files written by Gemini CLI 0.43.0+;
+    Pack Components table updated to match shipped intervals/filters
+  - Metadata: normalize `package.json` (pretty-print, trim trailing space in author); lint-clean README
 - **0.2.2** — 2026-03-11
-  - Enable `tailOnly: true` on all file inputs — eliminates re-reading entire files from beginning on every poll cycle; sessions are append-only, only new data needs processing
+  - Enable `tailOnly: true` on all file inputs — eliminates re-reading entire files from beginning on every poll cycle;
+    sessions are append-only, only new data needs processing
   - Enable `checkFileModTime: true` on all file inputs — skips unchanged files entirely, eliminating unnecessary I/O on every poll
   - Increase interval from 10s → 30s on `gemini-cli-sessions` and `antigravity-app-logs` — reduces recursive scan frequency for the largest directories
 - **0.2.1** — 2026-03-10
@@ -365,15 +432,17 @@ Cribl Edge tracks file state in its kvstore. If you need to re-ingest files from
 
 ## Authors
 
-* Andrew Hendrix - <Andrewh@VisiCoreTech.com>
-* Jacob Evans - <jevans@VisiCoreTech.com>
+- Andrew Hendrix - <Andrewh@VisiCoreTech.com>
+- Jacob Evans - <jevans@VisiCoreTech.com>
 
 To contact us, please email <CriblPacks@VisiCoreTech.com>.
 
 ## Contributing to the Pack
 
-To contribute to this Pack, or to report any issues or enhancement requests, please connect with **VisiCore Tech** on [Cribl Community Slack](https://cribl-community.slack.com) or email us at: <CriblPacks@visicoretech.com>.
+To contribute to this Pack, or to report any issues or enhancement requests, please connect with **VisiCore Tech** on
+[Cribl Community Slack](https://cribl-community.slack.com) or email us at: <CriblPacks@visicoretech.com>.
 
 ## License
+
 ---
 This Pack uses the following license: [`Apache 2.0`](https://github.com/criblio/appscope/blob/master/LICENSE)
