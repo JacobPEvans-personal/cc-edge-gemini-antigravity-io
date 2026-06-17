@@ -16,12 +16,7 @@ jobs:
         env:
           REPO_NAME: ${{ github.event.repository.name }}
           TAG_NAME: ${{ github.event.release.tag_name }}
-        run: |
-          # Versioned filename for archival
-          tar -czf "${REPO_NAME}-${TAG_NAME}.crbl" \
-            data default package.json README.md
-          # Fixed filename for latest-download URLs
-          cp "${REPO_NAME}-${TAG_NAME}.crbl" "${REPO_NAME}.crbl"
+        run: bash scripts/build-crbl-pack.sh
 
       - name: Upload to release
         env:
