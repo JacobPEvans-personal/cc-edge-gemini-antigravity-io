@@ -26,6 +26,20 @@ and forwards it to a Cribl Stream worker group for indexing, analysis, and searc
 3. **Annotations** — `~/.gemini/antigravity/annotations/*.pbtxt` — Annotation protobuf text metadata
 4. **Code tracker** — `~/.gemini/antigravity/code_tracker/**/*` — Code tracking snapshots and file state across active and historical sessions
 
+## Quick Start
+
+1. **Install the pack** into Cribl Edge via the pack registry or by uploading the `.crbl` zip file.
+2. **Set `GEMINI_HOME`** and configure Gemini CLI telemetry (run once on the Edge host):
+   ```bash
+   export GEMINI_HOME=/Users/<your-username>
+   export GEMINI_TELEMETRY_ENABLED=true
+   export GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4321
+   ```
+3. **Restart Cribl Edge** so it picks up the environment variable.
+4. **Grant read permissions** if Cribl Edge runs as a different user than the one that owns the Gemini/Antigravity files — see the [Setup](#setup) section for the `chmod +a` commands.
+
+For co-deployment with other AI observability packs on the same Edge node, override the OTLP port to **`4321`** to avoid conflicts — see [Setup → Port Allocation](#setup).
+
 ## Architecture
 
 ```text
