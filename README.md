@@ -44,7 +44,11 @@ Antigravity IDE ──writes──> ~/Library/Application Support/Antigravity/lo
                              Cribl HTTP --> Cribl Stream Worker Group
 ```
 
-## Data Sources
+## Usage
+
+Once installed, the pack continuously collects from the sources below and forwards each event to your Cribl Stream
+worker group, tagged with a `datatype` for downstream routing (see [Data Contract](#data-contract)). The sections
+below describe each data source and what to do with it.
 
 ### Gemini CLI Chat Sessions
 
@@ -150,21 +154,22 @@ Each document has `.resolved` and `.resolved.N` variants showing the evolution o
 
 ## Data Contract
 
-Events leave this pack tagged with a `datatype` metadata field; Cribl Stream maps datatypes to Splunk sourcetypes/indexes per the table below.
-Knowledge objects for the sourcetypes ship in
-[VisiCore_TA_AI_Observability](https://github.com/JacobPEvans-personal/VisiCore_TA_AI_Observability) (v0.2.0+).
+Events leave this pack tagged with a `datatype` metadata field. This is the pack's output contract: a downstream
+Cribl Stream pipeline maps each `datatype` to the Splunk sourcetype and index in the table below. To search the data in
+Splunk, your environment must define these sourcetypes and the `gemini` index (provide field extractions/knowledge objects
+to match, or adjust the mapping to your own naming).
 
-| Input | Datatype | Splunk sourcetype | Index | TA support |
-|---|---|---|---|---|
-| `gemini-cli-sessions` | `gemini-cli-session` | `gemini:cli:session` | `gemini` | ✓ |
-| `gemini-cli-logs` | `gemini-cli-logs` | `gemini:cli:logs` | `gemini` | ✓ |
-| `gemini-cli-settings` | `gemini-cli-settings` | `gemini:cli:settings` | `gemini` | ✓ |
-| `gemini-cli-projects` | `gemini-cli-projects` | `gemini:cli:projects` | `gemini` | ✓ |
-| `gemini-cli-otel` | `gemini-cli-otel` | `gemini:cli:otel` | `gemini` | ✓ (TA 0.2.0+) |
-| `antigravity-app-logs` | `antigravity-app-logs` | `antigravity:app-logs` | `gemini` | ✓ |
-| `antigravity-brain` | `antigravity-brain` | `antigravity:brain` | `gemini` | ✓ |
-| `antigravity-annotations` | `antigravity-annotations` | `antigravity:annotations` | `gemini` | ✓ |
-| `antigravity-code-tracker` | `antigravity-code-tracker` | `antigravity:code-tracker` | `gemini` | ✓ |
+| Input | Datatype | Splunk sourcetype | Index |
+|---|---|---|---|
+| `gemini-cli-sessions` | `gemini-cli-session` | `gemini:cli:session` | `gemini` |
+| `gemini-cli-logs` | `gemini-cli-logs` | `gemini:cli:logs` | `gemini` |
+| `gemini-cli-settings` | `gemini-cli-settings` | `gemini:cli:settings` | `gemini` |
+| `gemini-cli-projects` | `gemini-cli-projects` | `gemini:cli:projects` | `gemini` |
+| `gemini-cli-otel` | `gemini-cli-otel` | `gemini:cli:otel` | `gemini` |
+| `antigravity-app-logs` | `antigravity-app-logs` | `antigravity:app-logs` | `gemini` |
+| `antigravity-brain` | `antigravity-brain` | `antigravity:brain` | `gemini` |
+| `antigravity-annotations` | `antigravity-annotations` | `antigravity:annotations` | `gemini` |
+| `antigravity-code-tracker` | `antigravity-code-tracker` | `antigravity:code-tracker` | `gemini` |
 
 ---
 
@@ -179,7 +184,14 @@ Knowledge objects for the sourcetypes ship in
 
 ---
 
-## Setup
+## Installation
+
+Install the pack into Cribl Edge, then complete the two configuration steps below.
+
+```text
+# In the Cribl UI: Processing > Packs > Add Pack > Import
+# Upload the released .crbl file, then enable the pack on your Edge fleet.
+```
 
 ### Step 1: Set the `GEMINI_HOME` Environment Variable
 
@@ -222,27 +234,19 @@ ls "/Users/<user>/Library/Application Support/Antigravity/logs/"
 
 ### Port Allocation
 
-OTLP ports are allocated org-wide so the AI telemetry packs can co-exist on a single Edge node — only one listener can bind
-a given port per node:
+Only one listener can bind a given port per Edge node. The shipped `default/inputs.yml` binds the `gemini-cli-otel`
+listener to `4317` — the conventional OTLP/gRPC default. If another OTLP collector already owns `4317` on the same node,
+the two cannot co-exist.
 
-| Port | Protocol | Owner |
-|---|---|---|
-| `4317` | OTLP/gRPC | [cc-edge-claude-code-otel](https://github.com/JacobPEvans-personal/cc-edge-claude-code-otel) — canonical OTLP/gRPC default |
-| `4318` | OTLP/HTTP | Reserved for OTLP/HTTP (no pack ships an HTTP listener yet) |
-| `4319` | OTLP/gRPC | [cc-edge-copilot-otel](https://github.com/JacobPEvans-personal/cc-edge-copilot-otel) |
-| `4321` | OTLP/gRPC | **This pack** (`gemini-cli-otel` input) — recommended port when co-deployed |
-
-> **Known conflict:** the shipped `default/inputs.yml` binds the `gemini-cli-otel` listener to port `4317`, which is owned by
-> [cc-edge-claude-code-otel](https://github.com/JacobPEvans-personal/cc-edge-claude-code-otel). Both packs cannot listen on
-> `4317` on the same Edge node. When co-deploying with the Claude pack, override this pack's OTLP source port to **`4321`**
-> (via the Cribl UI or a local pack override) and point Gemini CLI at the new port:
+To run this pack alongside an existing OTLP/gRPC collector, override the `gemini-cli-otel` source port to a free port such
+as **`4321`** (via the Cribl UI or a local pack override) and point Gemini CLI at the new port:
 
 ```bash
 export GEMINI_TELEMETRY_ENABLED=true
 export GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4321
 ```
 
-The shipped default is unchanged in this release; only the recommended co-deployment configuration is documented here.
+The shipped default (`4317`) is unchanged in this release; only the recommended override is documented here.
 
 ---
 
@@ -272,7 +276,7 @@ All file monitors resolve paths via `$GEMINI_HOME`. Each sets a `datatype` metad
 | `gemini-cli-otel` | OpenTelemetry | `127.0.0.1` | `4317` | gRPC | Disabled |
 
 Receives native OpenTelemetry traces from Gemini CLI. Enable with `GEMINI_TELEMETRY_ENABLED=true` and `GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317`.
-See [Port Allocation](#port-allocation) before co-deploying with other OTLP packs.
+See [Port Allocation](#port-allocation) before running alongside another OTLP/gRPC collector on the same node.
 
 ### Output: `default`
 
@@ -402,9 +406,8 @@ clear the relevant kvstore directories, and restart.
 
 - **0.2.3** — 2026-06-10
   - Docs: add Data Contract section mapping all 9 inputs/datatypes to Splunk sourcetypes and the `gemini` index
-    (knowledge objects in VisiCore_TA_AI_Observability v0.2.0+)
-  - Docs: add org-wide OTLP Port Allocation table — document the 4317 conflict with cc-edge-claude-code-otel and the
-    recommended `4321` override when co-deployed (the shipped `inputs.yml` default is unchanged)
+  - Docs: add OTLP Port Allocation guidance — document the `4317` bind and the recommended `4321` override when another
+    OTLP/gRPC collector already owns `4317` (the shipped `inputs.yml` default is unchanged)
   - Includes the `gemini-cli-sessions` fix from #10: also match `.jsonl` session files written by Gemini CLI 0.43.0+;
     Pack Components table updated to match shipped intervals/filters
   - Metadata: normalize `package.json` (pretty-print, trim trailing space in author); lint-clean README
@@ -446,3 +449,6 @@ To contribute to this Pack, or to report any issues or enhancement requests, ple
 
 ---
 This Pack uses the following license: [`Apache 2.0`](https://github.com/criblio/appscope/blob/master/LICENSE)
+
+---
+> Part of a [larger ecosystem of ~40 repos](https://docs.jacobpevans.com) — see how it all fits together.
