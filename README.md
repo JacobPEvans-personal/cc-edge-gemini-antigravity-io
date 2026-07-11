@@ -1,434 +1,334 @@
-# Gemini CLI & Antigravity Pack For Edge
+# Antigravity CLI & IDE Pack For Edge
 
 ## Overview
 
-This Cribl Edge pack collects telemetry from 8 file monitor sources and 1 OTLP receiver across two Google AI developer tools
-and forwards it to a Cribl Stream worker group for indexing, analysis, and search:
+This Cribl Edge pack collects local telemetry from Google Antigravity developer tools and forwards it to a Cribl Stream
+worker group for indexing, analysis, and search.
 
-### Gemini CLI
+Default-enabled coverage is limited to Antigravity paths documented by Google docs or codelabs:
 
-1. **Chat sessions** — `~/.gemini/tmp/{projectHash}/chats/session-*.json` — Full conversation transcripts with messages,
-   tool calls, model thoughts, and per-message token usage
-2. **User logs** — `~/.gemini/tmp/{projectHash}/logs.json` — User interaction message logs with session IDs and timestamps
-3. **Settings** — `~/.gemini/settings.json` — Configuration snapshots including tool permissions, security settings, and context files
-4. **Projects** — `~/.gemini/projects.json` — Project metadata and Google Cloud project associations
+- **Antigravity CLI (`agy`)** - settings, keybindings, MCP config, plugin manifests/hooks, import manifest, and agent
+  brain markdown under `~/.gemini/antigravity-cli/`.
+- **Shared Antigravity configuration** - global MCP config under `~/.gemini/config/mcp_config.json`.
+- **Global rules** - Gemini/Antigravity global rules under `~/.gemini/GEMINI.md`.
 
-### Gemini CLI OpenTelemetry
+Candidate app, IDE, runtime log, history, annotation, and code-tracker monitors remain available but are disabled by
+default because the current Google documentation does not publish those paths as default local collection contracts.
 
-1. **OTLP receiver** — `127.0.0.1:4317` (gRPC) — Native OpenTelemetry traces from Gemini CLI when `GEMINI_TELEMETRY_ENABLED=true`
-   and `GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317`
-
-### Antigravity IDE
-
-1. **Application logs** — `~/Library/Application Support/Antigravity/logs/**/*.log` — Main process, extension host, language
-   server, auth, telemetry, CloudCode, Chrome DevTools MCP, renderer performance, and crash logs
-2. **Agent brain** — `~/.gemini/antigravity/brain/**/*.md` — Agent task files, implementation plans, and walkthroughs with resolved version history
-3. **Annotations** — `~/.gemini/antigravity/annotations/*.pbtxt` — Annotation protobuf text metadata
-4. **Code tracker** — `~/.gemini/antigravity/code_tracker/**/*` — Code tracking snapshots and file state across active and historical sessions
+Legacy Gemini CLI sources remain in the pack for compatibility but are disabled by default. Google announced that
+consumer Gemini CLI and Gemini Code Assist IDE extension request serving ends on **2026-06-18** for free, Pro, and Ultra
+users, while enterprise/API-key access can remain available. See Google's transition announcement:
+<https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/>.
 
 ## Architecture
 
 ```text
-Gemini CLI ──writes──> ~/.gemini/tmp/{hash}/chats/session-*.json
-    |                                   |
-    |                        Cribl Edge (file monitor)
-    |                                   |
-    └──OTLP gRPC──> Cribl Edge :4317 (OTLP receiver)
-                                        |
-Antigravity IDE ──writes──> ~/Library/Application Support/Antigravity/logs/**/*.log
-       |                                |
-       └──writes──> ~/.gemini/antigravity/brain/**/*.md
-                                        |
-                             Cribl Edge (file monitor)
-                                        |
-                             Cribl HTTP --> Cribl Stream Worker Group
+Antigravity CLI (agy) ──writes──> ~/.gemini/antigravity-cli/{settings.json,keybindings.json,mcp_config.json,brain}
+        |                                                  |
+        |                                       Cribl Edge file monitors
+        v                                                  |
+Antigravity IDE ───────writes──> ~/.gemini/antigravity-ide/{brain,annotations,code_tracker,daemon}
+        |                                                  |
+        v                                                  |
+Shared config ─────────writes──> ~/.gemini/config/mcp_config.json and ~/.gemini/GEMINI.md
+        |                                                  |
+        └────────────────────────────────────── Cribl HTTP output
+                                                           |
+                                                 Cribl Stream worker group
 ```
 
 ## Data Sources
 
-### Gemini CLI Chat Sessions
+### Antigravity CLI
 
-The richest data source. Each session JSON file contains the full conversation including:
+Antigravity CLI is the terminal-first `agy` interface. It writes its active local state under
+`~/.gemini/antigravity-cli/`.
 
-- **User messages** — The exact prompts sent to the model
-- **Gemini responses** — Model output with content blocks
-- **Tool calls** — File reads, writes, shell commands with full arguments and results
-- **Thoughts** — Model reasoning steps with subjects and descriptions
-- **Token usage** — Per-message breakdown: input, output, cached, thoughts, tool, total
-- **Model identification** — Which Gemini model was used (e.g., `gemini-3-pro-preview`)
-- **Session metadata** — Session ID, project hash, timestamps
+Collected by default:
 
-Use this data for:
+- **Settings** - `~/.gemini/antigravity-cli/settings.json`
+- **Keybindings** - `~/.gemini/antigravity-cli/keybindings.json`
+- **MCP config** - `~/.gemini/antigravity-cli/mcp_config.json`
+- **Plugin metadata** - `plugins/<plugin>/plugin.json`, `plugins/<plugin>/mcp_config.json`,
+  `plugins/<plugin>/hooks.json`, and `import_manifest.json`
+- **Agent brain markdown** - `~/.gemini/antigravity-cli/brain/**/*.md`
 
-- **Audit and compliance** — Complete record of every AI interaction
-- **Cost tracking** — Token consumption per session, project, and model
-- **Tool usage analysis** — What tools the agent invokes and how often
-- **Productivity metrics** — Session duration, message counts, tool call patterns
+Available but disabled by default:
 
-### Gemini CLI User Logs
+- `~/.gemini/antigravity-cli/**/*.log`
+- `~/.gemini/antigravity-cli/history.jsonl`
+- `~/.gemini/antigravity-cli/annotations/*.pbtxt`
+- `conversations/*.db`, `*.db-wal`, and `*.db-shm`
+- `implicit/*.pb`
+- uploaded media and executable helper binaries
 
-Lighter-weight logs recording only user-initiated messages:
+### Antigravity IDE
 
-- **Session ID** — Links messages to their full session
-- **Message ID** — Sequential message number within a session
-- **Type** — Always `user` in this log
-- **Message** — The raw prompt text
-- **Timestamp** — ISO 8601
+The Google docs identify Antigravity IDE as a separate surface, but they do not currently publish default local filesystem
+contracts for IDE logs, brain, annotation, code-tracker, or daemon state.
 
-### Gemini CLI OpenTelemetry (OTLP)
+Available but disabled by default:
 
-Gemini CLI has native OpenTelemetry support. When enabled, it exports traces via OTLP gRPC to a configurable endpoint.
-This pack includes an OTLP receiver on port 4317 to collect these traces directly.
+- **Agent brain** - `~/.gemini/antigravity-ide/brain/**/*.md` and `*.metadata.json`
+- **Annotations** - `~/.gemini/antigravity-ide/annotations/*.pbtxt`
+- **Code tracker** - `~/.gemini/antigravity-ide/code_tracker/**/*` text/source snapshots
+- **Daemon/runtime logs** - `~/.gemini/antigravity-ide/**/*.log`
+- **Config identity** - `mcp_config.json` and `installation_id`
 
-**Enable via environment variables:**
+### Antigravity Desktop App And Shared State
 
-```bash
-export GEMINI_TELEMETRY_ENABLED=true
-export GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317
-```
+The desktop app writes VS Code-style application logs and user settings under
+`~/Library/Application Support/Antigravity/`, app logs under `~/Library/Logs/Antigravity/`, and shared agent state under
+`~/.gemini/antigravity/` and `~/.gemini/config/`.
 
-**Or via `~/.gemini/settings.json`:**
+Collected by default:
 
-```json
-{
-  "telemetry": {
-    "enabled": true,
-    "otlpEndpoint": "http://localhost:4317",
-    "otlpProtocol": "grpc",
-    "logPrompts": true
-  }
-}
-```
+- **Shared MCP config** - `~/.gemini/config/mcp_config.json`
+- **Global rules** - `~/.gemini/GEMINI.md`
 
-Use this data for:
+Available but disabled by default:
 
-- **Distributed tracing** — End-to-end trace visibility across Gemini CLI tool invocations
-- **Latency analysis** — Model response times, tool execution duration
-- **Error tracking** — Failed operations with full trace context
-- **Correlation** — Link OTLP traces to file-based session data via session IDs
+- **Application logs** - `~/Library/Application Support/Antigravity/logs/**/*.log`
+- **macOS Library logs** - `~/Library/Logs/Antigravity/*.log`
+- **Application config** - app/user settings and cached configuration JSON
+- **Shared brain** - `~/.gemini/antigravity/brain/**/*.md` and `*.metadata.json`
+- **Shared annotations** - `~/.gemini/antigravity/annotations/*.pbtxt`
+- **Shared code tracker** - `~/.gemini/antigravity/code_tracker/**/*` text/source snapshots
+- **Shared runtime logs** - `~/.gemini/antigravity/**/*.log`
+- **Shared state/config** - root text protobuf state, MCP config, and installation identity
 
-### Antigravity IDE Application Logs
+Workspace rules can also exist under each project's `.agent/rules/` directory. This pack does not collect those by
+default because there is no single global workspace root to monitor safely.
 
-Antigravity (Google's AI IDE) writes timestamped session log directories containing:
+Common app log names include `main.log`, `auth.log`, `telemetry.log`, `cloudcode.log`, `rendererPerf.log`,
+`sharedprocess.log`, `terminal.log`, `artifacts.log`, `ptyhost.log`, `remoteTunnelService.log`, `renderer.log`,
+`network.log`, `textModelChanges.log`, `views.log`, `tasks.log`, `language_server.log`, and extension-host logs.
 
-```text
-Log File                                    Description
----------------------------------------------------------------------
-main.log                                    App lifecycle, perf profiling sessions
-auth.log                                    OAuth token changes and auth events
-telemetry.log                               Internal telemetry data
-cloudcode.log                               Cloud Code API endpoint configuration
-rendererPerf.log                            Renderer performance baseline and long tasks
-sharedprocess.log                           Shared process events
-terminal.log                                Terminal session events
-artifacts.log                               Artifact generation events
-ptyhost.log                                 PTY host process lifecycle
-remoteTunnelService.log                     Remote tunnel configuration
-window1/exthost/exthost.log                 Extension host startup and activation
-window1/exthost/google.antigravity/*.log    Language server (Go), crash logs
-window1/exthost/google.chrome-devtools-mcp/*.log  Chrome DevTools MCP server
-window1/exthost/vscode.git/Git.log          Git operations with timing
-window1/exthost/vscode.github/*.log         GitHub integration
-window1/renderer.log                        Renderer warnings and errors
-window1/network.log                         Network activity
-```
+### Legacy Gemini CLI
 
-Log format is: `YYYY-MM-DD HH:MM:SS.mmm [level] message`
+Legacy Gemini CLI inputs remain available but disabled by default:
 
-### Antigravity Agent Brain
+- `~/.gemini/tmp/**/chats/session-*.json`
+- `~/.gemini/tmp/**/chats/session-*.jsonl`
+- `~/.gemini/tmp/**/logs.json`
+- `~/.gemini/settings.json`
+- `~/.gemini/projects.json`
+- OTLP gRPC receiver on `127.0.0.1:4317`
 
-The Antigravity agent maintains a "brain" directory with per-session UUID folders containing:
+Enable these inputs only when you still have a supported Gemini CLI deployment to monitor.
 
-- **task.md** — Current task description with resolved versions tracking iterative refinement
-- **implementation_plan.md** — Step-by-step implementation plans with metadata
-- **walkthrough.md** — Code walkthroughs and explanations
-- **\*.metadata.json** — Metadata for each document including revision counts
+## OpenTelemetry
 
-Each document has `.resolved` and `.resolved.N` variants showing the evolution of the agent's thinking.
+Antigravity-specific custom OTel handling is not added in this pack. Cribl already has a built-in OpenTelemetry source,
+and no current Antigravity CLI/IDE documentation requires a nonstandard OTLP receiver or payload path.
 
----
+The legacy Gemini CLI OTLP input remains present but disabled by default. Gemini CLI's documented telemetry settings use
+standard OTLP fields such as `GEMINI_TELEMETRY_ENABLED`, `GEMINI_TELEMETRY_OTLP_ENDPOINT`,
+`GEMINI_TELEMETRY_OTLP_PROTOCOL`, and `GEMINI_TELEMETRY_OUTFILE`. See:
+<https://google-gemini.github.io/gemini-cli/docs/cli/telemetry.html>.
 
 ## Data Contract
 
-Events leave this pack tagged with a `datatype` metadata field; Cribl Stream maps datatypes to Splunk sourcetypes/indexes per the table below.
-Knowledge objects for the sourcetypes ship in
-[VisiCore_TA_AI_Observability](https://github.com/JacobPEvans-personal/VisiCore_TA_AI_Observability) (v0.2.0+).
+Events leave this pack tagged with a `datatype` metadata field. Downstream Cribl Stream routes or destinations can map
+these datatypes to indexes, sourcetypes, datasets, or storage paths.
 
-| Input | Datatype | Splunk sourcetype | Index | TA support |
-|---|---|---|---|---|
-| `gemini-cli-sessions` | `gemini-cli-session` | `gemini:cli:session` | `gemini` | ✓ |
-| `gemini-cli-logs` | `gemini-cli-logs` | `gemini:cli:logs` | `gemini` | ✓ |
-| `gemini-cli-settings` | `gemini-cli-settings` | `gemini:cli:settings` | `gemini` | ✓ |
-| `gemini-cli-projects` | `gemini-cli-projects` | `gemini:cli:projects` | `gemini` | ✓ |
-| `gemini-cli-otel` | `gemini-cli-otel` | `gemini:cli:otel` | `gemini` | ✓ (TA 0.2.0+) |
-| `antigravity-app-logs` | `antigravity-app-logs` | `antigravity:app-logs` | `gemini` | ✓ |
-| `antigravity-brain` | `antigravity-brain` | `antigravity:brain` | `gemini` | ✓ |
-| `antigravity-annotations` | `antigravity-annotations` | `antigravity:annotations` | `gemini` | ✓ |
-| `antigravity-code-tracker` | `antigravity-code-tracker` | `antigravity:code-tracker` | `gemini` | ✓ |
-
----
+| Input                          | Datatype                       | Default  |
+| ------------------------------ | ------------------------------ | -------- |
+| `antigravity-app-logs`         | `antigravity-app-logs`         | Disabled |
+| `antigravity-library-logs`     | `antigravity-library-logs`     | Disabled |
+| `antigravity-app-config`       | `antigravity-app-config`       | Disabled |
+| `antigravity-brain`            | `antigravity-brain`            | Disabled |
+| `antigravity-annotations`      | `antigravity-annotations`      | Disabled |
+| `antigravity-code-tracker`     | `antigravity-code-tracker`     | Disabled |
+| `antigravity-runtime-logs`     | `antigravity-runtime-logs`     | Disabled |
+| `antigravity-state`            | `antigravity-state`            | Disabled |
+| `antigravity-shared-config`    | `antigravity-shared-config`    | Enabled  |
+| `antigravity-global-rules`     | `antigravity-global-rules`     | Enabled  |
+| `antigravity-cli-logs`         | `antigravity-cli-logs`         | Disabled |
+| `antigravity-cli-history`      | `antigravity-cli-history`      | Disabled |
+| `antigravity-cli-config`       | `antigravity-cli-config`       | Enabled  |
+| `antigravity-cli-brain`        | `antigravity-cli-brain`        | Enabled  |
+| `antigravity-cli-annotations`  | `antigravity-cli-annotations`  | Disabled |
+| `antigravity-ide-logs`         | `antigravity-ide-logs`         | Disabled |
+| `antigravity-ide-config`       | `antigravity-ide-config`       | Disabled |
+| `antigravity-ide-brain`        | `antigravity-ide-brain`        | Disabled |
+| `antigravity-ide-annotations`  | `antigravity-ide-annotations`  | Disabled |
+| `antigravity-ide-code-tracker` | `antigravity-ide-code-tracker` | Disabled |
+| `gemini-cli-sessions`          | `gemini-cli-session`           | Disabled |
+| `gemini-cli-logs`              | `gemini-cli-logs`              | Disabled |
+| `gemini-cli-settings`          | `gemini-cli-settings`          | Disabled |
+| `gemini-cli-projects`          | `gemini-cli-projects`          | Disabled |
+| `gemini-cli-otel`              | `gemini-cli-otel`              | Disabled |
 
 ## Requirements
 
-- **Cribl Edge** 4.13.0+
-- **Gemini CLI** installed for the local user (`/opt/homebrew/bin/gemini` or equivalent)
-- **Antigravity IDE** installed (`/Applications/Antigravity.app` on macOS)
-- **Supported platforms:** macOS (Sonoma 14+, Sequoia 15+, Tahoe 26)
-- **Filesystem permissions:** The Cribl Edge process must have read access to `~/.gemini/` and
-  `~/Library/Application Support/Antigravity/` (if using the respective inputs)
-
----
+- Cribl Edge 4.13.0+
+- Antigravity CLI installed for the local user when collecting CLI sources
+- Antigravity desktop app or IDE installed when enabling candidate app/IDE sources
+- Supported default paths: macOS user-home layout
+- Filesystem permissions for the Cribl Edge process to read `~/.gemini/`,
+  `~/Library/Application Support/Antigravity/`, and `~/Library/Logs/Antigravity/`
 
 ## Setup
 
-### Step 1: Set the `GEMINI_HOME` Environment Variable
+### Set `GEMINI_HOME`
 
-All file monitor paths use `$GEMINI_HOME/.gemini/<subdir>` or `$GEMINI_HOME/Library/Application Support/Antigravity/<subdir>`
-to resolve their target directories. Set `GEMINI_HOME` to the **home directory** of the user that runs Gemini CLI and/or Antigravity.
+All file monitors resolve paths from `$GEMINI_HOME`. Set it to the home directory of the user running Antigravity:
 
 ```bash
-# macOS
 export GEMINI_HOME=/Users/<user>
 ```
 
-> After setting the variable, restart the Cribl Edge service for it to take effect.
+Restart Cribl Edge after setting the variable.
 
-### Step 2: Grant Filesystem Permissions
+### Grant Filesystem Permissions
 
-On macOS, Cribl Edge is typically installed under the current user account. If Edge is running as the same user that owns
-the Gemini/Antigravity files, no additional permission changes are needed.
-
-If Edge runs as a different user, grant read access using macOS ACLs:
+If Edge runs as the same user that owns the Antigravity files, no extra permissions are normally required. If Edge runs as
+a different user on macOS, grant read/list/search access:
 
 ```bash
-# Grant read access to Gemini CLI data
 chmod +a "cribl allow read,readattr,readextattr,readsecurity,list,search" /Users/<user>/.gemini
 chmod -R +a "cribl allow read,readattr,readextattr,readsecurity,list,search" /Users/<user>/.gemini/
-
-# Grant read access to Antigravity logs
 chmod +a "cribl allow read,readattr,readextattr,readsecurity,list,search" "/Users/<user>/Library/Application Support/Antigravity"
-chmod -R +a "cribl allow read,readattr,readextattr,readsecurity,list,search" "/Users/<user>/Library/Application Support/Antigravity/logs/"
+chmod -R +a "cribl allow read,readattr,readextattr,readsecurity,list,search" "/Users/<user>/Library/Application Support/Antigravity/"
+chmod +a "cribl allow read,readattr,readextattr,readsecurity,list,search" "/Users/<user>/Library/Logs/Antigravity"
+chmod -R +a "cribl allow read,readattr,readextattr,readsecurity,list,search" "/Users/<user>/Library/Logs/Antigravity/"
 ```
 
-**Verification:**
+### Verify Source Files
 
 ```bash
-# Verify Gemini CLI sessions are readable
-ls /Users/<user>/.gemini/tmp/*/chats/
-
-# Verify Antigravity logs are readable
-ls "/Users/<user>/Library/Application Support/Antigravity/logs/"
+find /Users/<user>/.gemini/antigravity-cli -name "settings.json" -o -name "keybindings.json" -o -name "mcp_config.json" -o -name "import_manifest.json" -o -name "*.md" | head
+find /Users/<user>/.gemini/config -name "mcp_config.json" | head
+test -f /Users/<user>/.gemini/GEMINI.md && echo "global rules found"
 ```
-
-### Port Allocation
-
-OTLP ports are allocated org-wide so the AI telemetry packs can co-exist on a single Edge node — only one listener can bind
-a given port per node:
-
-| Port | Protocol | Owner |
-|---|---|---|
-| `4317` | OTLP/gRPC | [cc-edge-claude-code-otel](https://github.com/JacobPEvans-personal/cc-edge-claude-code-otel) — canonical OTLP/gRPC default |
-| `4318` | OTLP/HTTP | Reserved for OTLP/HTTP (no pack ships an HTTP listener yet) |
-| `4319` | OTLP/gRPC | [cc-edge-copilot-otel](https://github.com/JacobPEvans-personal/cc-edge-copilot-otel) |
-| `4321` | OTLP/gRPC | **This pack** (`gemini-cli-otel` input) — recommended port when co-deployed |
-
-> **Known conflict:** the shipped `default/inputs.yml` binds the `gemini-cli-otel` listener to port `4317`, which is owned by
-> [cc-edge-claude-code-otel](https://github.com/JacobPEvans-personal/cc-edge-claude-code-otel). Both packs cannot listen on
-> `4317` on the same Edge node. When co-deploying with the Claude pack, override this pack's OTLP source port to **`4321`**
-> (via the Cribl UI or a local pack override) and point Gemini CLI at the new port:
-
-```bash
-export GEMINI_TELEMETRY_ENABLED=true
-export GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4321
-```
-
-The shipped default is unchanged in this release; only the recommended co-deployment configuration is documented here.
-
----
 
 ## Pack Components
 
-These are preconfigured in the pack. This section is for reference — no action is needed here unless you want to customize the defaults.
-
 ### File Monitor Inputs
 
-All file monitors resolve paths via `$GEMINI_HOME`. Each sets a `datatype` metadata field for downstream routing.
+All file monitors set `metadata.datatype` for downstream routing.
 
-| Input | Path | Filter | Recursive | Interval |
-|---|---|---|---|---|
-| `gemini-cli-sessions` | `.gemini/tmp` | `session-*.json, session-*.jsonl` | Yes | 30s |
-| `gemini-cli-logs` | `.gemini/tmp` | `logs.json` | Yes | 30s |
-| `gemini-cli-settings` | `.gemini` | `settings.json` | No | 120s |
-| `gemini-cli-projects` | `.gemini` | `projects.json` | No | 120s |
-| `antigravity-app-logs` | `Library/Application Support/Antigravity/logs` | `*.log` | Yes | 30s |
-| `antigravity-brain` | `.gemini/antigravity/brain` | `*.md` | Yes | 60s |
-| `antigravity-annotations` | `.gemini/antigravity/annotations` | `*.pbtxt` | No | 60s |
-| `antigravity-code-tracker` | `.gemini/antigravity/code_tracker` | `*.md, *.sh, *.nix, *.yaml, *.json` | Yes | 60s |
+| Input                          | Path                                           | Filter                                     | Recursive | Default  |
+| ------------------------------ | ---------------------------------------------- | ------------------------------------------ | --------- | -------- |
+| `antigravity-app-logs`         | `Library/Application Support/Antigravity/logs` | `*.log`                                    | Yes       | Disabled |
+| `antigravity-library-logs`     | `Library/Logs/Antigravity`                     | `*.log`                                    | Yes       | Disabled |
+| `antigravity-app-config`       | `Library/Application Support/Antigravity`      | app/user/config JSON                       | Yes       | Disabled |
+| `antigravity-brain`            | `.gemini/antigravity/brain`                    | `*.md`, `*.metadata.json`                  | Yes       | Disabled |
+| `antigravity-annotations`      | `.gemini/antigravity/annotations`              | `*.pbtxt`                                  | No        | Disabled |
+| `antigravity-code-tracker`     | `.gemini/antigravity/code_tracker`             | text/source snapshots                      | Yes       | Disabled |
+| `antigravity-runtime-logs`     | `.gemini/antigravity`                          | `*.log`                                    | Yes       | Disabled |
+| `antigravity-state`            | `.gemini/antigravity`                          | root `.pbtxt`, MCP config, installation ID | No        | Disabled |
+| `antigravity-shared-config`    | `.gemini/config`                               | `mcp_config.json`                          | Yes       | Enabled  |
+| `antigravity-global-rules`     | `.gemini`                                      | `GEMINI.md`                                | No        | Enabled  |
+| `antigravity-cli-logs`         | `.gemini/antigravity-cli`                      | `*.log`                                    | Yes       | Disabled |
+| `antigravity-cli-history`      | `.gemini/antigravity-cli`                      | `history.jsonl`                            | No        | Disabled |
+| `antigravity-cli-config`       | `.gemini/antigravity-cli`                      | settings, keybindings, MCP, plugin JSON    | Yes       | Enabled  |
+| `antigravity-cli-brain`        | `.gemini/antigravity-cli/brain`                | `*.md`                                     | Yes       | Enabled  |
+| `antigravity-cli-annotations`  | `.gemini/antigravity-cli/annotations`          | `*.pbtxt`                                  | No        | Disabled |
+| `antigravity-ide-logs`         | `.gemini/antigravity-ide`                      | `*.log`                                    | Yes       | Disabled |
+| `antigravity-ide-config`       | `.gemini/antigravity-ide`                      | MCP config, installation ID                | No        | Disabled |
+| `antigravity-ide-brain`        | `.gemini/antigravity-ide/brain`                | `*.md`, `*.metadata.json`                  | Yes       | Disabled |
+| `antigravity-ide-annotations`  | `.gemini/antigravity-ide/annotations`          | `*.pbtxt`                                  | No        | Disabled |
+| `antigravity-ide-code-tracker` | `.gemini/antigravity-ide/code_tracker`         | text/source snapshots                      | Yes       | Disabled |
+| `gemini-cli-*`                 | `.gemini` and `.gemini/tmp`                    | legacy Gemini CLI files                    | Mixed     | Disabled |
+
+### Binary Stores Not Collected
+
+The following files are intentionally not monitored by default:
+
+- `~/.gemini/antigravity-cli/conversations/*.db`
+- `~/.gemini/antigravity-cli/conversations/*.db-wal`
+- `~/.gemini/antigravity-cli/conversations/*.db-shm`
+- `~/.gemini/antigravity-cli/implicit/*.pb`
+- `~/.gemini/antigravity/conversations/*.db`
+- `~/.gemini/antigravity/conversations/*.db-wal`
+- `~/.gemini/antigravity/conversations/*.db-shm`
+- `~/.gemini/antigravity/conversations/*.pb`
+- `~/.gemini/antigravity/implicit/*.pb`
+- `~/.gemini/antigravity-ide/conversations/*.pb`
+- `~/.gemini/antigravity-ide/implicit/*.pb`
+- `~/Library/Application Support/Antigravity/shared_proto_db/*`
+- `~/Library/Application Support/Antigravity/Session Storage/*`
+- executable helpers, uploaded media, and cache blobs
+
+These stores can contain high-volume binary data and are better handled with a purpose-built parser or a downstream
+forensics workflow instead of generic file tailing.
 
 ### OTLP Input
 
-| Input | Type | Host | Port | Protocol | TLS |
-|---|---|---|---|---|---|
-| `gemini-cli-otel` | OpenTelemetry | `127.0.0.1` | `4317` | gRPC | Disabled |
+| Input             | Type          | Host        | Port | Protocol | TLS      | Default  |
+| ----------------- | ------------- | ----------- | ---- | -------- | -------- | -------- |
+| `gemini-cli-otel` | OpenTelemetry | `127.0.0.1` | 4317 | gRPC     | Disabled | Disabled |
 
-Receives native OpenTelemetry traces from Gemini CLI. Enable with `GEMINI_TELEMETRY_ENABLED=true` and `GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317`.
-See [Port Allocation](#port-allocation) before co-deploying with other OTLP packs.
+This is retained only for legacy Gemini CLI deployments.
 
 ### Output: `default`
 
-- **Type:** Cribl HTTP
-- **Compression:** gzip
-- **Concurrency:** 5
-
-Forwards events to the Cribl Stream worker group for further routing and delivery to your destination of choice (Splunk, S3, Elastic, etc.).
-
----
-
-## Reference: Gemini CLI Session Schema
-
-Each `session-*.json` file is a standalone JSON document with this structure:
-
-```text
-Field                        Description
----------------------------------------------------------------------
-sessionId                    Unique session identifier (UUID)
-projectHash                  SHA-256 hash of the project directory
-startTime                    ISO 8601 session start timestamp
-lastUpdated                  ISO 8601 last activity timestamp
-messages[]                   Array of conversation turns
-  .id                        Unique message ID (UUID)
-  .timestamp                 ISO 8601 message timestamp
-  .type                      "user" or "gemini"
-  .content                   Message text content
-  .toolCalls[]               Tool invocations (gemini turns only)
-    .id                      Tool call ID
-    .name                    Tool name (read_file, write_file, shell, etc.)
-    .args                    Tool arguments object
-    .result[]                Tool execution results
-    .status                  "success" or "error"
-    .displayName             Human-readable tool name
-    .description             Tool description
-  .thoughts[]                Model reasoning steps (gemini turns only)
-    .subject                 Thought topic
-    .description             Reasoning detail
-    .timestamp               When the thought occurred
-  .model                     Model identifier (e.g., "gemini-3-pro-preview")
-  .tokens                    Token usage breakdown (gemini turns only)
-    .input                   Input tokens consumed
-    .output                  Output tokens generated
-    .cached                  Tokens served from cache
-    .thoughts                Tokens used for reasoning
-    .tool                    Tokens used for tool interactions
-    .total                   Total tokens for this turn
-```
-
-## Reference: Antigravity Log Format
-
-All Antigravity logs follow the VS Code log format:
-
-```text
-YYYY-MM-DD HH:MM:SS.mmm [level] message
-```
-
-Levels: `info`, `warning`, `error`
-
-### Key Log Sources
-
-#### Language Server (Go)
-
-- Process startup with PID and GOMAXPROCS
-- HTTPS/HTTP port bindings on localhost
-- Server initialization timing
-- MCP URL discovery
-
-#### Extension Host
-
-- Extension activation order and timing
-- Activation events and root causes
-- Extension errors and missing modules
-
-#### Chrome DevTools MCP
-
-- MCP server URL and port
-- Browser connection configuration
-
-#### Performance
-
-- Renderer baseline measurements
-- Long task detection (>100ms threshold)
-- Profiling session start/stop
-
----
+- Type: Cribl HTTP
+- Compression: gzip
+- Concurrency: 5
 
 ## Troubleshooting
 
 ### No events flowing
 
-1. Verify `$GEMINI_HOME` is set correctly and points to the user's home directory.
-2. Check that the file monitor discovered files in the Cribl Edge logs.
+1. Verify `$GEMINI_HOME` points to the owning user's home directory.
+2. Check that the file monitor discovered files in Cribl Edge logs.
 3. Verify the route is not disabled in the Cribl UI.
 4. Confirm the output destination is reachable.
 
-### No Gemini CLI session files found
+### No default Antigravity CLI files found
 
-1. Verify Gemini CLI has been used at least once: `ls ~/.gemini/tmp/*/chats/`
-2. Check that session files exist: `find ~/.gemini/tmp -name "session-*.json" | head -5`
-3. Ensure `$GEMINI_HOME` resolves correctly in the Cribl Edge environment.
+1. Run `agy` at least once.
+2. Check `ls ~/.gemini/antigravity-cli/`.
+3. Check
+   `find ~/.gemini/antigravity-cli -name "settings.json" -o -name "keybindings.json" -o -name "mcp_config.json" -o -name "*.md" | head`.
 
-### No Antigravity logs found
+### No Antigravity IDE or desktop app candidate files found
 
-1. Verify Antigravity has been launched at least once: `ls ~/Library/Application\ Support/Antigravity/logs/`
-2. Check that log directories contain `.log` files: `find ~/Library/Application\ Support/Antigravity/logs/ -name "*.log" -size +0c | head -10`
-3. Note that some Antigravity log files may be empty (0 bytes) if the feature wasn't used in that session.
+1. Launch Antigravity at least once.
+2. Check `ls ~/.gemini/antigravity-ide/` and `ls ~/.gemini/antigravity/`.
+3. Check `find ~/Library/Application\ Support/Antigravity/logs -name "*.log" | head`.
+4. Check `find ~/Library/Logs/Antigravity -name "*.log" | head`.
+5. Enable the relevant candidate input before expecting these files to flow.
 
-### No OTLP data from Gemini CLI
+### No legacy Gemini CLI data
 
-1. Verify telemetry is enabled: `echo $GEMINI_TELEMETRY_ENABLED` should return `true`.
-2. Verify the endpoint: `echo $GEMINI_TELEMETRY_OTLP_ENDPOINT` should return `http://localhost:4317`.
-3. Alternatively check `~/.gemini/settings.json` for a `telemetry` block with `enabled: true`.
-4. Confirm port 4317 is not in use by another collector: `lsof -i :4317`.
-5. Check Cribl Edge logs for OTLP receiver bind errors.
+Legacy Gemini inputs are disabled by default in this release. Enable the relevant `gemini-cli-*` source only if the host
+still runs a supported Gemini CLI deployment.
 
 ### Stale file tracking
 
-Cribl Edge tracks file state in its kvstore. If you need to re-ingest files from the beginning, stop the worker,
-clear the relevant kvstore directories, and restart.
+Cribl Edge tracks file state in its kvstore. If you need to re-ingest files from the beginning, stop the worker, clear the
+relevant kvstore directories, and restart.
 
 - macOS: `/opt/cribl/state/kvstore/default/file_gemini-cli-*/` and `/opt/cribl/state/kvstore/default/file_antigravity-*/`
 
----
-
 ## Release Notes
 
-- **0.2.3** — 2026-06-10
-  - Docs: add Data Contract section mapping all 9 inputs/datatypes to Splunk sourcetypes and the `gemini` index
-    (knowledge objects in VisiCore_TA_AI_Observability v0.2.0+)
-  - Docs: add org-wide OTLP Port Allocation table — document the 4317 conflict with cc-edge-claude-code-otel and the
-    recommended `4321` override when co-deployed (the shipped `inputs.yml` default is unchanged)
-  - Includes the `gemini-cli-sessions` fix from #10: also match `.jsonl` session files written by Gemini CLI 0.43.0+;
-    Pack Components table updated to match shipped intervals/filters
-  - Metadata: normalize `package.json` (pretty-print, trim trailing space in author); lint-clean README
-- **0.2.2** — 2026-03-11
-  - Enable `tailOnly: true` on all file inputs — eliminates re-reading entire files from beginning on every poll cycle;
-    sessions are append-only, only new data needs processing
-  - Enable `checkFileModTime: true` on all file inputs — skips unchanged files entirely, eliminating unnecessary I/O on every poll
-  - Increase interval from 10s → 30s on `gemini-cli-sessions` and `antigravity-app-logs` — reduces recursive scan frequency for the largest directories
-- **0.2.1** — 2026-03-10
-  - Fix FileMonitor filename patterns: add leading wildcard (`*session-*.json`, `*logs.json`, etc.) required by Cribl 4.16.x FileMonitor behavior change
-- **0.2.0** — 2026-03-06
-  - Added OTLP gRPC receiver (port 4317) for Gemini CLI native OpenTelemetry traces
-  - Added route for `gemini-cli-otel` input
-  - Added telemetry configuration documentation (env vars and settings.json)
-  - Added OTLP troubleshooting section
-- **0.1.0** — 2026-03-07
-  - Initial release
-  - 4 Gemini CLI file monitor inputs (sessions, logs, settings, projects)
-  - 4 Antigravity IDE file monitor inputs (app logs, brain, annotations, code tracker)
-  - Per-input `datatype` metadata for downstream sourcetype mapping
-  - `GEMINI_HOME` environment variable for path resolution
-  - macOS ACL-based permission model
-  - Sanitized sample data for all major event types
-  - Automated `.crbl` pack release via GitHub Actions
+- **0.3.0** - 2026-06-12
+  - Default-enabled coverage now targets only Google-documented Antigravity filesystem paths.
+  - Added Antigravity CLI config, plugin metadata, and brain markdown inputs.
+  - Added shared MCP config collection for `.gemini/config/mcp_config.json`.
+  - Added Antigravity global rules collection for `.gemini/GEMINI.md`.
+  - Added Antigravity app, IDE, runtime log, history, annotation, and code-tracker candidate inputs as disabled by
+    default where Google docs do not publish local default path contracts.
+  - Disabled legacy Gemini CLI file and OTLP inputs by default.
+  - Documented binary SQLite/protobuf stores as intentionally not collected.
+- **0.2.3** - 2026-06-10
+  - Added Data Contract section and OTLP port allocation notes.
+  - Added `.jsonl` Gemini CLI session matching.
+  - Normalized `package.json` metadata and README formatting.
+- **0.2.2** - 2026-03-11
+  - Enabled `tailOnly: true` and `checkFileModTime: true` on file inputs.
+  - Increased intervals for the largest recursive inputs.
+- **0.2.1** - 2026-03-10
+  - Fixed FileMonitor filename patterns for Cribl 4.16.x behavior.
+- **0.2.0** - 2026-03-06
+  - Added OTLP gRPC receiver for Gemini CLI telemetry.
+- **0.1.0** - 2026-03-07
+  - Initial release with Gemini CLI and Antigravity IDE file monitors.
 
 ## Authors
 
@@ -444,5 +344,4 @@ To contribute to this Pack, or to report any issues or enhancement requests, ple
 
 ## License
 
----
 This Pack uses the following license: [`Apache 2.0`](https://github.com/criblio/appscope/blob/master/LICENSE)

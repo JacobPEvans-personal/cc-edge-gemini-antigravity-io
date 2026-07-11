@@ -1,13 +1,22 @@
 {
   "name": "cc-edge-gemini-antigravity",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "minLogStreamVersion": "4.13.0",
   "author": "VisiCore Tech - CriblPacks@VisiCoreTech.com",
-  "description": "Cribl Edge Pack that collects Gemini CLI session logs, chat history, settings, native OpenTelemetry traces, and Antigravity IDE application logs, agent brain data, and annotations from the local filesystem, then forwards them to a Cribl Stream worker group for indexing, analysis, and search. Includes an OTLP gRPC receiver on port 4317 for Gemini CLI telemetry. Each data source gets a unique datatype metadata value for downstream sourcetype mapping.",
-  "displayName": "Gemini CLI & Antigravity Pack For Edge",
+  "description": "Cribl Edge Pack that collects documented Google Antigravity CLI configuration, plugin metadata, agent brain markdown, shared MCP configuration, and global rules from the local filesystem, then forwards them to a Cribl Stream worker group for indexing, analysis, and search. Candidate app, IDE, runtime log, history, annotation, code-tracker, legacy Gemini CLI, and OTLP sources remain available but disabled by default. Each data source gets a unique datatype metadata value for downstream sourcetype mapping.",
+  "displayName": "Antigravity CLI & IDE Pack For Edge",
   "tags": {
-    "streamtags": ["vct", "ai", "gemini", "google", "antigravity", "otel"],
-    "dataType": ["logs"]
+    "streamtags": [
+      "vct",
+      "ai",
+      "gemini",
+      "google",
+      "antigravity",
+      "otel"
+    ],
+    "dataType": [
+      "logs"
+    ]
   },
   "exports": []
 }

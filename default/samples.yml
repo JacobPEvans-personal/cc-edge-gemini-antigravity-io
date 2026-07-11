@@ -3,7 +3,8 @@ gemini_session:
   created: 1772000000000
   size: 2500
   numEvents: 1
-  description: A Gemini CLI chat session containing user and gemini messages, tool
+  description:
+    A Gemini CLI chat session containing user and gemini messages, tool
     calls with file read/write operations, thought processes, model identification,
     and per-message token usage breakdowns (input, output, cached, thoughts, tool,
     total). Sessions are stored per-project hash.
@@ -12,7 +13,8 @@ gemini_logs:
   created: 1772000100000
   size: 800
   numEvents: 1
-  description: User interaction logs from Gemini CLI sessions. Each entry contains
+  description:
+    User interaction logs from Gemini CLI sessions. Each entry contains
     a sessionId, messageId, type (user), the raw message text, and ISO timestamp.
     Useful for tracking prompt patterns and session engagement.
 antigravity_main:
@@ -20,7 +22,8 @@ antigravity_main:
   created: 1772000200000
   size: 1200
   numEvents: 1
-  description: Antigravity IDE main process logs including onboarding server startup,
+  description:
+    Antigravity IDE main process logs including onboarding server startup,
     update state changes, performance profiling sessions (STARTED/DONE with UUIDs),
     and extension host lifecycle events. Format is timestamp [level] message.
 antigravity_extension:
@@ -37,7 +40,40 @@ antigravity_brain:
   created: 1772000400000
   size: 1500
   numEvents: 1
-  description: Agent brain task and plan files from Antigravity sessions. Contains
+  description:
+    Agent brain task and plan files from Antigravity sessions. Contains
     implementation plans, task status with resolved versions tracking iterative
     refinement, and walkthrough documents. Each brain session is identified by a
     UUID and may contain multiple resolved versions of each document.
+antigravity_cli_log:
+  sampleName: sanitized_antigravity_cli.log
+  created: 1781280000000
+  size: 900
+  numEvents: 1
+  description:
+    Antigravity CLI runtime log entries from ~/.gemini/antigravity-cli/log.
+    Includes process startup, configuration loading, MCP initialization, model
+    selection, and agent execution status.
+antigravity_cli_history:
+  sampleName: sanitized_antigravity_cli_history.jsonl
+  created: 1781280100000
+  size: 600
+  numEvents: 2
+  description:
+    Antigravity CLI prompt history JSONL from ~/.gemini/antigravity-cli/history.jsonl.
+    Useful for prompt audit and lightweight CLI usage timelines.
+antigravity_cli_settings:
+  sampleName: sanitized_antigravity_cli_settings.json
+  created: 1781280200000
+  size: 1200
+  numEvents: 1
+  description: Antigravity CLI settings, permissions, MCP server, sandbox, and
+    status line configuration from ~/.gemini/antigravity-cli/settings.json.
+antigravity_ide_daemon:
+  sampleName: sanitized_antigravity_ide_daemon.log
+  created: 1781280300000
+  size: 700
+  numEvents: 1
+  description:
+    Antigravity IDE daemon and language-service logs from ~/.gemini/antigravity-ide/daemon
+    or ~/.gemini/antigravity/daemon.

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+  "general": {
+    "defaultApprovalMode": "auto_edit",
+    "disableAutoUpdate": true
+  },
+  "mcpServers": {
+    "context7": {
+      "command": "bunx",
+      "args": ["@upstash/context7-mcp@3.1.0"]
+    }
+  },
+  "security": {
+    "folderTrust": {
+      "enabled": true,
+      "trustedFolders": ["/Users/example/work"]
+    }
+  },
+  "tools": {
+    "sandbox": true,
+    "sandboxAllowedPaths": ["/Users/example/work"]
+  }
+}
