@@ -1,0 +1,2 @@
+{"conversationId":"014ded4f-1b0b-4e0a-aae0-063cb4867508","display":"List the files in the repo root and summarize the project layout.","timestamp":"2026-06-07T18:39:00.000Z","workspace":"/Users/example/repo","type":"user"}
+{"conversationId":"014ded4f-1b0b-4e0a-aae0-063cb4867508","display":"The repo has a README, a src directory, and a tests directory.","timestamp":"2026-06-07T18:39:10.000Z","workspace":"/Users/example/repo"}

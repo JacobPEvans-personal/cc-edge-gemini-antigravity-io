@@ -82,6 +82,26 @@ routes:
     filter: __inputId=='file:cc-edge-gemini-antigravity.antigravity-code-tracker'
     clones: []
     output: default
+  - id: antigravity-cli-transcripts
+    name: Antigravity CLI Transcripts (File Monitor)
+    final: true
+    disabled: false
+    pipeline: main
+    description: "Antigravity CLI (agy) agent session transcripts with tool calls, planner responses, and thoughts"
+    enableOutputExpression: false
+    filter: __inputId=='file:cc-edge-gemini-antigravity.antigravity-cli-transcripts'
+    clones: []
+    output: default
+  - id: antigravity-cli-history
+    name: Antigravity CLI History (File Monitor)
+    final: true
+    disabled: false
+    pipeline: main
+    description: "Antigravity CLI (agy) conversation history index: conversationId, display text, timestamp, workspace"
+    enableOutputExpression: false
+    filter: __inputId=='file:cc-edge-gemini-antigravity.antigravity-cli-history'
+    clones: []
+    output: default
   - id: gemini-otel
     name: Gemini CLI OpenTelemetry (OTLP gRPC)
     final: true
