@@ -6,7 +6,7 @@ routes:
     name: Gemini CLI Sessions (File Monitor)
     final: true
     disabled: false
-    pipeline: main
+    pipeline: llm_normalize
     description: "Gemini CLI chat session JSON files with messages, tool calls, thoughts, and token usage"
     enableOutputExpression: false
     filter: __inputId=='file:cc-edge-gemini-antigravity.gemini-cli-sessions'
@@ -86,7 +86,7 @@ routes:
     name: Antigravity CLI Transcripts (File Monitor)
     final: true
     disabled: false
-    pipeline: main
+    pipeline: llm_normalize
     description: "Antigravity CLI (agy) agent session transcripts with tool calls, planner responses, and thoughts"
     enableOutputExpression: false
     filter: __inputId=='file:cc-edge-gemini-antigravity.antigravity-cli-transcripts'
