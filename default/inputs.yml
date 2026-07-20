@@ -220,6 +220,60 @@ inputs:
       - name: datatype
         value: "'antigravity-code-tracker'"
 
+  antigravity-cli-transcripts:
+    disabled: false
+    sendToRoutes: true
+    pqEnabled: false
+    streamtags: []
+    mode: manual
+    interval: 60
+    filenames:
+      - "transcript_full.jsonl"
+    filterArchivedFiles: false
+    tailOnly: false
+    idleTimeout: 300
+    checkFileModTime: true
+    forceText: false
+    hashLen: 256
+    staleChannelFlushMs: 10000
+    suppressMissingPathErrors: false
+    deleteFiles: false
+    saltHash: false
+    includeUnidentifiableBinary: false
+    recurse: true
+    type: file
+    path: "$GEMINI_HOME/.gemini/antigravity-cli/brain"
+    metadata:
+      - name: datatype
+        value: "'antigravity-cli-transcript'"
+
+  antigravity-cli-history:
+    disabled: false
+    sendToRoutes: true
+    pqEnabled: false
+    streamtags: []
+    mode: manual
+    interval: 30
+    filenames:
+      - "*history.jsonl"
+    filterArchivedFiles: false
+    tailOnly: true
+    idleTimeout: 300
+    checkFileModTime: true
+    forceText: false
+    hashLen: 256
+    staleChannelFlushMs: 10000
+    suppressMissingPathErrors: false
+    deleteFiles: false
+    saltHash: false
+    includeUnidentifiableBinary: false
+    recurse: false
+    type: file
+    path: "$GEMINI_HOME/.gemini/antigravity-cli"
+    metadata:
+      - name: datatype
+        value: "'antigravity-cli-history'"
+
   gemini-cli-otel:
     disabled: false
     sendToRoutes: true

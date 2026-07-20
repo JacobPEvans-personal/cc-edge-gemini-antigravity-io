@@ -2,7 +2,7 @@
 
 ## Overview
 
-This Cribl Edge pack collects telemetry from 8 file monitor sources and 1 OTLP receiver across two Google AI developer tools
+This Cribl Edge pack collects telemetry from 10 file monitor sources and 1 OTLP receiver across two Google AI developer tools
 and forwards it to a Cribl Stream worker group for indexing, analysis, and search:
 
 ### Gemini CLI
@@ -25,6 +25,10 @@ and forwards it to a Cribl Stream worker group for indexing, analysis, and searc
 2. **Agent brain** — `~/.gemini/antigravity/brain/**/*.md` — Agent task files, implementation plans, and walkthroughs with resolved version history
 3. **Annotations** — `~/.gemini/antigravity/annotations/*.pbtxt` — Annotation protobuf text metadata
 4. **Code tracker** — `~/.gemini/antigravity/code_tracker/**/*` — Code tracking snapshots and file state across active and historical sessions
+5. **CLI transcripts** — `~/.gemini/antigravity-cli/brain/{conversationId}/.system_generated/logs/transcript_full.jsonl` — Antigravity CLI (agy)
+   agent session transcripts: user input, planner responses, tool calls, and thoughts
+6. **CLI history** — `~/.gemini/antigravity-cli/history.jsonl` — Antigravity CLI conversation history index (conversationId, display text,
+   timestamp, workspace)
 
 ## Architecture
 
@@ -146,6 +150,22 @@ The Antigravity agent maintains a "brain" directory with per-session UUID folder
 
 Each document has `.resolved` and `.resolved.N` variants showing the evolution of the agent's thinking.
 
+### Antigravity CLI Transcripts
+
+The Antigravity CLI (`agy`) writes per-conversation transcripts under `~/.gemini/antigravity-cli/brain/{conversationId}/.system_generated/logs/`
+as two files: `transcript.jsonl` and `transcript_full.jsonl`. Both contain the same step events (same line count, same `type`/`step_index`/
+`created_at` values) — `transcript.jsonl` double-escapes tool-call argument strings while `transcript_full.jsonl` carries them unescaped.
+This pack ingests **only `transcript_full.jsonl`**; adding `transcript.jsonl` too would double-count every event under a near-identical body.
+
+Each line is a step event: `type` (`USER_INPUT`, `PLANNER_RESPONSE`, `LIST_DIRECTORY`, `VIEW_FILE`, `GENERIC`, etc.), `source`, `status`,
+`step_index`, `created_at`, `content`, and optional `tool_calls`. `tailOnly: false` is intentional — each transcript is a static
+per-conversation file, so the input performs a full backfill rather than only tailing new appends.
+
+### Antigravity CLI History
+
+`~/.gemini/antigravity-cli/history.jsonl` is a single append-only index of every CLI conversation: `conversationId`, `display` (the user
+prompt or agent reply text), ISO `timestamp`, and `workspace` path. Useful for session activity search without parsing full transcripts.
+
 ---
 
 ## Data Contract
@@ -155,7 +175,7 @@ Knowledge objects for the sourcetypes ship in
 [VisiCore_TA_AI_Observability](https://github.com/JacobPEvans-personal/VisiCore_TA_AI_Observability) (v0.2.0+).
 
 | Input | Datatype | Splunk sourcetype | Index | TA support |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `gemini-cli-sessions` | `gemini-cli-session` | `gemini:cli:session` | `gemini` | ✓ |
 | `gemini-cli-logs` | `gemini-cli-logs` | `gemini:cli:logs` | `gemini` | ✓ |
 | `gemini-cli-settings` | `gemini-cli-settings` | `gemini:cli:settings` | `gemini` | ✓ |
@@ -165,6 +185,8 @@ Knowledge objects for the sourcetypes ship in
 | `antigravity-brain` | `antigravity-brain` | `antigravity:brain` | `gemini` | ✓ |
 | `antigravity-annotations` | `antigravity-annotations` | `antigravity:annotations` | `gemini` | ✓ |
 | `antigravity-code-tracker` | `antigravity-code-tracker` | `antigravity:code-tracker` | `gemini` | ✓ |
+| `antigravity-cli-transcripts` | `antigravity-cli-transcript` | `antigravity:cli:transcript` | `gemini` | — |
+| `antigravity-cli-history` | `antigravity-cli-history` | `antigravity:cli:history` | `gemini` | — |
 
 ---
 
@@ -226,7 +248,7 @@ OTLP ports are allocated org-wide so the AI telemetry packs can co-exist on a si
 a given port per node:
 
 | Port | Protocol | Owner |
-|---|---|---|
+| --- | --- | --- |
 | `4317` | OTLP/gRPC | [cc-edge-claude-code-otel](https://github.com/JacobPEvans-personal/cc-edge-claude-code-otel) — canonical OTLP/gRPC default |
 | `4318` | OTLP/HTTP | Reserved for OTLP/HTTP (no pack ships an HTTP listener yet) |
 | `4319` | OTLP/gRPC | [cc-edge-copilot-otel](https://github.com/JacobPEvans-personal/cc-edge-copilot-otel) |
@@ -255,7 +277,7 @@ These are preconfigured in the pack. This section is for reference — no action
 All file monitors resolve paths via `$GEMINI_HOME`. Each sets a `datatype` metadata field for downstream routing.
 
 | Input | Path | Filter | Recursive | Interval |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `gemini-cli-sessions` | `.gemini/tmp` | `session-*.json, session-*.jsonl` | Yes | 30s |
 | `gemini-cli-logs` | `.gemini/tmp` | `logs.json` | Yes | 30s |
 | `gemini-cli-settings` | `.gemini` | `settings.json` | No | 120s |
@@ -264,12 +286,14 @@ All file monitors resolve paths via `$GEMINI_HOME`. Each sets a `datatype` metad
 | `antigravity-brain` | `.gemini/antigravity/brain` | `*.md` | Yes | 60s |
 | `antigravity-annotations` | `.gemini/antigravity/annotations` | `*.pbtxt` | No | 60s |
 | `antigravity-code-tracker` | `.gemini/antigravity/code_tracker` | `*.md, *.sh, *.nix, *.yaml, *.json` | Yes | 60s |
+| `antigravity-cli-transcripts` | `.gemini/antigravity-cli/brain` | `transcript_full.jsonl` | Yes | 60s |
+| `antigravity-cli-history` | `.gemini/antigravity-cli` | `*history.jsonl` | No | 30s |
 
 ### OTLP Input
 
-| Input | Type | Host | Port | Protocol | TLS |
-|---|---|---|---|---|---|
-| `gemini-cli-otel` | OpenTelemetry | `127.0.0.1` | `4317` | gRPC | Disabled |
+| Input             | Type          | Host        | Port   | Protocol | TLS      |
+| ----------------- | ------------- | ----------- | ------ | -------- | -------- |
+| `gemini-cli-otel` | OpenTelemetry | `127.0.0.1` | `4317` | gRPC     | Disabled |
 
 Receives native OpenTelemetry traces from Gemini CLI. Enable with `GEMINI_TELEMETRY_ENABLED=true` and `GEMINI_TELEMETRY_OTLP_ENDPOINT=http://localhost:4317`.
 See [Port Allocation](#port-allocation) before co-deploying with other OTLP packs.
@@ -400,6 +424,14 @@ clear the relevant kvstore directories, and restart.
 
 ## Release Notes
 
+- **0.3.0** — 2026-07-20
+  - Added `antigravity-cli-transcripts` input: ingests `transcript_full.jsonl` from the Antigravity CLI (`agy`) per-conversation
+    brain directories (`.gemini/antigravity-cli/brain/{conversationId}/.system_generated/logs/`). Only `transcript_full.jsonl`
+    is ingested — `transcript.jsonl` carries the same events with double-escaped tool-call args, so ingesting both would
+    double-count every event
+  - Added `antigravity-cli-history` input: ingests `.gemini/antigravity-cli/history.jsonl`, the conversation activity index
+  - Added routes for both new datatypes; Data Contract and File Monitor Inputs tables updated to 11 inputs
+  - Added sanitized `.jsonl` sample fixtures for both new datatypes
 - **0.2.3** — 2026-06-10
   - Docs: add Data Contract section mapping all 9 inputs/datatypes to Splunk sourcetypes and the `gemini` index
     (knowledge objects in VisiCore_TA_AI_Observability v0.2.0+)

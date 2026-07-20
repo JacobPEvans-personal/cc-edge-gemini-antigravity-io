@@ -41,3 +41,22 @@ antigravity_brain:
     implementation plans, task status with resolved versions tracking iterative
     refinement, and walkthrough documents. Each brain session is identified by a
     UUID and may contain multiple resolved versions of each document.
+antigravity_cli_transcript:
+  sampleName: sanitized_antigravity_cli_transcript.jsonl
+  created: 1772000500000
+  size: 900
+  numEvents: 1
+  description: Antigravity CLI (agy) agent session transcript. Each line is a
+    step event (USER_INPUT, PLANNER_RESPONSE, tool-result types, GENERIC) with
+    type, source, status, step_index, created_at, content, and optional
+    tool_calls. Stored per-conversation UUID under the antigravity-cli brain
+    directory as transcript_full.jsonl.
+antigravity_cli_history:
+  sampleName: sanitized_antigravity_cli_history.jsonl
+  created: 1772000600000
+  size: 450
+  numEvents: 1
+  description: Antigravity CLI (agy) conversation history index. Each line has
+    a conversationId, display text (user prompt or agent reply), ISO timestamp,
+    and workspace path. Useful for tracking session activity across
+    conversations without parsing full transcripts.
