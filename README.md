@@ -424,6 +424,11 @@ clear the relevant kvstore directories, and restart.
 
 ## Release Notes
 
+- **0.4.0** — 2026-07-20
+  - Added `llm_normalize` pipeline: maps `gemini-cli-sessions` and `antigravity-cli-transcripts` events to
+    OpenTelemetry-AI `llm.*` semantic-convention attributes (`llm.model`, `llm.prompt`, `llm.completion`,
+    `llm.agent.name`, `llm.agent.step`). Re-pointed only those two routes from `pipeline: main`; all other
+    routes are unchanged. Raw source fields are preserved - this only adds derived attributes
 - **0.3.0** — 2026-07-20
   - Added `antigravity-cli-transcripts` input: ingests `transcript_full.jsonl` from the Antigravity CLI (`agy`) per-conversation
     brain directories (`.gemini/antigravity-cli/brain/{conversationId}/.system_generated/logs/`). Only `transcript_full.jsonl`

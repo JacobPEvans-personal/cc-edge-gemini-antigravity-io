@@ -1,0 +1,40 @@
+output: default
+streamtags: []
+groups: {}
+asyncFuncTimeout: 1000
+description: >-
+  OpenTelemetry-AI llm.* semantic-convention normalization. Adds llm.* core
+  attributes (llm-spans.md) and llm.agent.* attributes (llm-chains-agents.md)
+  for the two sources that carry prompt/completion content: Gemini CLI chat
+  sessions and Antigravity CLI (agy) step transcripts. Never removes or
+  renames the source's raw fields - this only adds derived attributes.
+functions:
+  - id: eval
+    filter: "typeof messages !== 'undefined'"
+    disabled: false
+    conf:
+      add:
+        - name: llm.model
+          value: >-
+            (function(){ var m = (messages || []).slice().reverse().find(function(x){
+            return x.model; }); return m ? m.model : undefined; })()
+        - name: llm.prompt
+          value: "JSON.stringify(messages || [])"
+        - name: llm.completion
+          value: "''"
+  - id: eval
+    filter: "typeof step_index !== 'undefined'"
+    disabled: false
+    conf:
+      add:
+        - name: llm.agent.name
+          value: >-
+            (function(){ var src = __source || ''; var m =
+            src.match(/antigravity-cli\/brain\/([^/]+)\//); return m ? m[1] :
+            src; })()
+        - name: llm.agent.step
+          value: "step_index"
+        - name: llm.prompt
+          value: "source === 'user' ? content : ''"
+        - name: llm.completion
+          value: "source === 'user' ? '' : content"
