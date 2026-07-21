@@ -8,7 +8,22 @@ description: >-
   for the two sources that carry prompt/completion content: Gemini CLI chat
   sessions and Antigravity CLI (agy) step transcripts. Never removes or
   renames the source's raw fields - this only adds derived attributes.
+  Also stamps Splunk-canonical sourcetype/index at the Edge (per datatype)
+  so the values survive to Splunk regardless of the Stream ingest path.
 functions:
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      add:
+        - name: sourcetype
+          value: >-
+            datatype === 'gemini-cli-session' ? 'gemini:cli:session'
+            : datatype === 'antigravity-cli-transcript' ? 'antigravity:cli:transcript'
+            : datatype === 'antigravity-cli-history' ? 'antigravity:cli:history'
+            : sourcetype
+        - name: index
+          value: "'gemini'"
   - id: eval
     filter: "typeof messages !== 'undefined'"
     disabled: false

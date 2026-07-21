@@ -96,7 +96,7 @@ routes:
     name: Antigravity CLI History (File Monitor)
     final: true
     disabled: false
-    pipeline: main
+    pipeline: llm_normalize
     description: "Antigravity CLI (agy) conversation history index: conversationId, display text, timestamp, workspace"
     enableOutputExpression: false
     filter: __inputId=='file:cc-edge-gemini-antigravity.antigravity-cli-history'
