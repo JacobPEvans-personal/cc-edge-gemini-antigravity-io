@@ -424,6 +424,13 @@ clear the relevant kvstore directories, and restart.
 
 ## Release Notes
 
+- **0.4.1** — 2026-07-21
+  - `llm_normalize` now stamps Splunk-canonical `sourcetype`/`index` at the Edge per `datatype`
+    (`gemini-cli-session` → `gemini:cli:session`, `antigravity-cli-transcript` → `antigravity:cli:transcript`,
+    `antigravity-cli-history` → `antigravity:cli:history`; all `index=gemini`). Edge-side stamps survive to Splunk
+    regardless of the Stream ingest path, matching the codex pack. Re-pointed the `antigravity-cli-history` route
+    from `pipeline: main` to `llm_normalize` so it reaches the stamp; the `llm.*` evals skip it via their `typeof`
+    filters, so only the sourcetype/index stamp applies
 - **0.4.0** — 2026-07-20
   - Added `llm_normalize` pipeline: maps `gemini-cli-sessions` and `antigravity-cli-transcripts` events to
     OpenTelemetry-AI `llm.*` semantic-convention attributes (`llm.model`, `llm.prompt`, `llm.completion`,
